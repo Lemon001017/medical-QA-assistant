@@ -40,7 +40,7 @@ DB_USER=root
 DB_PASSWORD=your_mysql_password
 DB_NAME=medical_qa
 JWT_SECRET=your-secret-key-change-in-production
-PORT=8080
+PORT=8081
 EOF
 ```
 
@@ -51,7 +51,7 @@ EOF
 go run cmd/server/main.go
 ```
 
-后端将在 `http://localhost:8080` 启动。
+后端将在 `http://localhost:8081` 启动。
 
 ## 步骤 3: 启动前端
 
@@ -83,33 +83,6 @@ npm run dev
 4. 注册成功后会自动跳转到首页
 5. 可以点击"退出"按钮，然后使用刚才注册的账号登录
 
-## 测试 API（可选）
-
-使用 curl 测试 API：
-
-**注册：**
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "email": "test@example.com",
-    "password": "password123"
-  }'
-```
-
-**登录：**
-```bash
-curl -X POST http://localhost:8080/api/v1/auth/login \
-  -H "Content-Type: application/json" \
-  -d '{
-    "username": "testuser",
-    "password": "password123"
-  }'
-```
-
-登录成功后会返回 token，可以用于后续的认证请求。
-
 ## 常见问题
 
 ### 后端无法连接数据库
@@ -118,10 +91,10 @@ curl -X POST http://localhost:8080/api/v1/auth/login \
 - 确认数据库 `medical_qa` 已创建
 
 ### 前端无法连接后端
-- 确认后端服务正在运行（`http://localhost:8080`）
+- 确认后端服务正在运行（`http://localhost:8081`）
 - 检查浏览器控制台是否有 CORS 错误
 - 确认 `vite.config.js` 中的代理配置正确
 
 ### 端口被占用
-- 后端默认端口：8080，可在 `.env` 中修改 `PORT`
+- 后端默认端口：8081，可在 `.env` 中修改 `PORT`
 - 前端默认端口：3000，可在 `vite.config.js` 中修改

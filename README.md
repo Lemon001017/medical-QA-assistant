@@ -41,7 +41,7 @@ cp .env.example .env
 go run cmd/server/main.go
 ```
 
-后端服务将在 `http://localhost:8080` 启动。
+后端服务将在 `http://localhost:8081` 启动。
 
 ### 前端设置
 
