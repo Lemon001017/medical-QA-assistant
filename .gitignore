@@ -4,4 +4,4 @@ dist/
 frontend/node_modules/
 backend/bin/
 *.env
-*.gopath
+.gopath/
