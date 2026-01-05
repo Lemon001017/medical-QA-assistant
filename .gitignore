@@ -3,4 +3,5 @@ dist/
 .DS_Store
 frontend/node_modules/
 backend/bin/
-.env
+*.env
+*.gopath
