@@ -1,6 +1,7 @@
 package api
 
 import (
+	"medical-qa-assistant/internal/config"
 	"medical-qa-assistant/internal/handlers"
 	"medical-qa-assistant/internal/middleware"
 	"medical-qa-assistant/internal/repositories"
@@ -10,7 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-func SetupRoutes(db *gorm.DB, jwtSecret string) *gin.Engine {
+func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
 	// CORS middleware
@@ -30,12 +31,24 @@ func SetupRoutes(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 	// Initialize repositories
 	userRepo := repositories.NewUserRepository(db)
+	documentRepo := repositories.NewDocumentRepository(db)
 
 	// Initialize services
-	authService := services.NewAuthService(userRepo, jwtSecret)
+	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
+	documentService := services.NewDocumentService(documentRepo)
+
+	var qaService *services.QAService
+	switch cfg.LLMProvider {
+	case "deepseek":
+		qaService = services.NewQAService(cfg.DeepSeekKey, cfg.DeepSeekModel, cfg.DeepSeekBaseURL)
+	default:
+		qaService = services.NewQAService(cfg.OpenAIKey, cfg.OpenAIModel, cfg.OpenAIBaseURL)
+	}
 
 	// Initialize handlers
 	authHandler := handlers.NewAuthHandler(authService)
+	documentHandler := handlers.NewDocumentHandler(documentService)
+	qaHandler := handlers.NewQAHandler(qaService)
 
 	// Public routes
 	api := router.Group("/api/v1")
@@ -46,10 +59,14 @@ func SetupRoutes(db *gorm.DB, jwtSecret string) *gin.Engine {
 
 	// Protected routes
 	protected := api.Group("")
-	protected.Use(middleware.AuthMiddleware(jwtSecret))
+	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{
-		// Add protected routes here in the future
-		// Example: protected.GET("/profile", userHandler.GetProfile)
+		protected.POST("/documents", documentHandler.Create)
+		protected.POST("/documents/upload", documentHandler.Upload)
+		protected.GET("/documents", documentHandler.List)
+		protected.GET("/documents/:id", documentHandler.Get)
+		protected.DELETE("/documents/:id", documentHandler.Delete)
+		protected.POST("/qa/ask", qaHandler.Ask)
 	}
 
 	return router

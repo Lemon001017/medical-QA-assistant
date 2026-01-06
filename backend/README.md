@@ -17,9 +17,9 @@ CREATE DATABASE medical_qa;
 cp .env.example .env
 ```
 
-4. Update `.env` with your database credentials and JWT secret.
+4. Update `.env` with your database credentials, JWT secret, and optional OpenAI settings.
 
-5. Run the server:
+5. Run the server (the process will auto-load `.env` if present):
 ```bash
 go run cmd/server/main.go
 ```

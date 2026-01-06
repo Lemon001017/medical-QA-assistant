@@ -31,9 +31,9 @@ cd backend
 go mod download
 ```
 
-3. 配置环境变量（创建 `.env` 文件）：
+3. 配置环境变量（创建 `.env` 文件，程序会自动加载）：
 ```bash
-cat > .env << EOF
+cat > .env << 'EOF'
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
@@ -41,12 +41,19 @@ DB_PASSWORD=your_mysql_password
 DB_NAME=medical_qa
 JWT_SECRET=your-secret-key-change-in-production
 PORT=8081
+OPENAI_BASE_URL=https://api.openai.com
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5
+
+DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
+DEEPSEEK_API_KEY=
+DEEPSEEK_MODEL=deepseek-chat
 EOF
 ```
 
-请将 `your_mysql_password` 替换为你的 MySQL 密码。
+请将 `your_mysql_password` 替换为你的 MySQL 密码，并按需填写 `OPENAI_API_KEY`。
 
-4. 启动后端服务：
+4. 启动后端服务（会自动尝试加载当前目录下的 `.env`）：
 ```bash
 go run cmd/server/main.go
 ```
