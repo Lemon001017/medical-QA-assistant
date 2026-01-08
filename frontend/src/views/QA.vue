@@ -22,11 +22,15 @@
               rows="6"
               required
               placeholder="请输入医学相关问题"
+              :disabled="loading"
             ></textarea>
           </div>
           <div class="actions">
             <button type="submit" :disabled="loading">
               {{ loading ? '思考中...' : '发送' }}
+            </button>
+            <button v-if="loading" type="button" @click="handleStop" class="stop-btn">
+              停止
             </button>
           </div>
         </form>
@@ -34,7 +38,7 @@
 
       <section class="panel" v-if="answer || error">
         <h2>回答</h2>
-        <p v-if="answer" class="answer">{{ answer }}</p>
+        <div v-if="answer" class="answer">{{ answer }}</div>
         <p v-else class="error">{{ error }}</p>
       </section>
     </main>
@@ -42,10 +46,9 @@
 </template>
 
 <script>
-import { computed, ref } from 'vue'
+import { computed, ref, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useAuthStore } from '../stores/auth'
-import { askQuestion } from '../api'
 
 export default {
   name: 'QA',
@@ -58,26 +61,113 @@ export default {
     const answer = ref('')
     const error = ref('')
     const loading = ref(false)
+    let abortController = null
 
-    const handleAsk = async () => {
+    const handleAsk = () => {
       if (!question.value.trim()) return
       loading.value = true
       answer.value = ''
       error.value = ''
-      try {
-        const { data } = await askQuestion({ question: question.value })
-        answer.value = data?.answer || ''
-      } catch (err) {
-        error.value = err?.response?.data?.error || '请求失败'
-      } finally {
-        loading.value = false
+
+      // Create abort controller for cancellation
+      abortController = new AbortController()
+
+      // Use fetch with POST for SSE (EventSource doesn't support POST)
+      const baseURL = import.meta.env.VITE_API_BASE_URL || '/api/v1'
+      fetch(`${baseURL}/qa/ask/stream`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${authStore.token}`
+        },
+        body: JSON.stringify({ question: question.value }),
+        signal: abortController.signal
+      })
+        .then(response => {
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`)
+          }
+
+          const reader = response.body.getReader()
+          const decoder = new TextDecoder()
+          let buffer = ''
+
+          const readStream = () => {
+            reader.read().then(({ done, value }) => {
+              if (done) {
+                loading.value = false
+                abortController = null
+                return
+              }
+
+              buffer += decoder.decode(value, { stream: true })
+              const lines = buffer.split('\n')
+              buffer = lines.pop() || ''
+
+              for (const line of lines) {
+                if (line.startsWith('data: ')) {
+                  const data = line.slice(6)
+                  if (data.trim()) {
+                    try {
+                      const parsed = JSON.parse(data)
+                      if (parsed.error) {
+                        error.value = parsed.error
+                        loading.value = false
+                        abortController = null
+                        return
+                      }
+                      if (parsed.done) {
+                        loading.value = false
+                        abortController = null
+                        return
+                      }
+                      if (parsed.chunk) {
+                        answer.value += parsed.chunk
+                      }
+                    } catch (e) {
+                      console.error('Failed to parse SSE data:', e)
+                    }
+                  }
+                }
+              }
+
+              readStream()
+            }).catch(err => {
+              if (err.name !== 'AbortError') {
+                error.value = err.message || '流式请求失败'
+                loading.value = false
+              }
+              abortController = null
+            })
+          }
+
+          readStream()
+        })
+        .catch(err => {
+          if (err.name !== 'AbortError') {
+            error.value = err.message || '请求失败'
+            loading.value = false
+          }
+        })
+    }
+
+    const handleStop = () => {
+      if (abortController) {
+        abortController.abort()
+        abortController = null
       }
+      loading.value = false
     }
 
     const handleLogout = () => {
+      handleStop()
       authStore.logout()
       router.push('/login')
     }
+
+    onUnmounted(() => {
+      handleStop()
+    })
 
     return {
       user,
@@ -86,6 +176,7 @@ export default {
       error,
       loading,
       handleAsk,
+      handleStop,
       handleLogout
     }
   }
@@ -189,10 +280,20 @@ button[type='submit'] {
   color: white;
 }
 
+.actions button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.stop-btn {
+  background-color: #e74c3c !important;
+}
+
 .answer {
   white-space: pre-wrap;
   line-height: 1.6;
   color: #2c3e50;
+  min-height: 20px;
 }
 
 .error {

@@ -67,6 +67,7 @@ func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		protected.GET("/documents/:id", documentHandler.Get)
 		protected.DELETE("/documents/:id", documentHandler.Delete)
 		protected.POST("/qa/ask", qaHandler.Ask)
+		protected.POST("/qa/ask/stream", qaHandler.AskStream)
 	}
 
 	return router

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"strings"
 
 	openai "github.com/sashabaranov/go-openai"
@@ -74,4 +75,61 @@ func (s *QAService) Ask(ctx context.Context, userID uint, question string) (*Ask
 
 	answer := resp.Choices[0].Message.Content
 	return &AskResponse{Answer: answer}, nil
+}
+
+// AskStream handles streaming question answering via SSE.
+// It writes chunks to the provided writer function as they arrive.
+func (s *QAService) AskStream(ctx context.Context, userID uint, question string, writeChunk func(string) error) error {
+	if userID == 0 {
+		return errors.New("invalid user")
+	}
+	if s.client == nil {
+		return errors.New("llm client not configured (missing LLM API key)")
+	}
+	trimmed := strings.TrimSpace(question)
+	if trimmed == "" {
+		return errors.New("question is empty")
+	}
+
+	req := openai.ChatCompletionRequest{
+		Model: s.model,
+		Messages: []openai.ChatCompletionMessage{
+			{
+				Role:    openai.ChatMessageRoleSystem,
+				Content: "你是一个智能医学问答助手，请根据用户的问题，给出简洁明了的回答。",
+			},
+			{
+				Role:    openai.ChatMessageRoleUser,
+				Content: trimmed,
+			},
+		},
+		Temperature: 0.2,
+		Stream:      true,
+	}
+
+	stream, err := s.client.CreateChatCompletionStream(ctx, req)
+	if err != nil {
+		return fmt.Errorf("failed to create stream: %w", err)
+	}
+	defer stream.Close()
+
+	for {
+		response, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			// Stream ended
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("stream error: %w", err)
+		}
+
+		if len(response.Choices) > 0 {
+			delta := response.Choices[0].Delta.Content
+			if delta != "" {
+				if err := writeChunk(delta); err != nil {
+					return fmt.Errorf("failed to write chunk: %w", err)
+				}
+			}
+		}
+	}
 }
