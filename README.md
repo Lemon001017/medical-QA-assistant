@@ -62,33 +62,6 @@ npm run dev
 
 前端应用将在 `http://localhost:3000` 启动。
 
-## API 端点
-
-### 认证接口
-
-- `POST /api/v1/auth/register` - 用户注册
-- `POST /api/v1/auth/login` - 用户登录
-
-### 请求示例
-
-**注册：**
-```json
-POST /api/v1/auth/register
-{
-  "username": "testuser",
-  "email": "test@example.com",
-  "password": "password123"
-}
-```
-
-**登录：**
-```json
-POST /api/v1/auth/login
-{
-  "username": "testuser",
-  "password": "password123"
-}
-```
 
 ## 功能特性
 
@@ -97,7 +70,7 @@ POST /api/v1/auth/login
 - ✅ 密码加密存储
 - ✅ 前端路由保护
 - ⏳ 医学文档管理（待实现）
-- ⏳ RAG 问答功能（待实现）
+- ✅ RAG 问答功能
 - ⏳ 对话历史（待实现）
 
 ## 技术栈
