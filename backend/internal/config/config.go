@@ -14,13 +14,18 @@ type Config struct {
 	Port       string
 
 	// LLM config
-	LLMProvider     string
-	OpenAIKey       string
-	OpenAIModel     string
-	OpenAIBaseURL   string
-	DeepSeekKey     string
-	DeepSeekModel   string
-	DeepSeekBaseURL string
+	LLMProvider      string
+	OpenAIKey        string
+	OpenAIModel      string
+	OpenAIBaseURL    string
+	OpenAIEmbedModel string
+	DeepSeekKey      string
+	DeepSeekModel    string
+	DeepSeekBaseURL  string
+
+	// Chroma config
+	ChromaBaseURL    string
+	ChromaCollection string
 }
 
 func Load() *Config {
@@ -33,13 +38,17 @@ func Load() *Config {
 		JWTSecret:  getEnv("JWT_SECRET", "dev-secret-change-me"),
 		Port:       getEnv("PORT", "8081"),
 
-		LLMProvider:     getEnv("LLM_PROVIDER", "openai"), // openai | deepseek
-		OpenAIKey:       getEnv("OPENAI_API_KEY", ""),
-		OpenAIModel:     getEnv("OPENAI_MODEL", "gpt-3.5-turbo"),
-		OpenAIBaseURL:   getEnv("OPENAI_BASE_URL", "https://api.openai.com"),
-		DeepSeekKey:     getEnv("DEEPSEEK_API_KEY", ""),
-		DeepSeekModel:   getEnv("DEEPSEEK_MODEL", "deepseek-chat"),
-		DeepSeekBaseURL: getEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+		LLMProvider:      getEnv("LLM_PROVIDER", "openai"), // openai | deepseek
+		OpenAIKey:        getEnv("OPENAI_API_KEY", ""),
+		OpenAIModel:      getEnv("OPENAI_MODEL", "gpt-3.5-turbo"),
+		OpenAIBaseURL:    getEnv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
+		OpenAIEmbedModel: getEnv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
+		DeepSeekKey:      getEnv("DEEPSEEK_API_KEY", ""),
+		DeepSeekModel:    getEnv("DEEPSEEK_MODEL", "deepseek-chat"),
+		DeepSeekBaseURL:  getEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
+
+		ChromaBaseURL:    getEnv("CHROMA_BASE_URL", "http://localhost:8000"),
+		ChromaCollection: getEnv("CHROMA_COLLECTION", "medical_documents"),
 	}
 }
 

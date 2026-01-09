@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"medical-qa-assistant/internal/logger"
 	"medical-qa-assistant/internal/services"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"go.uber.org/zap"
 )
 
 // QAHandler handles question answering requests.
@@ -22,18 +24,26 @@ func NewQAHandler(qaService *services.QAService) *QAHandler {
 func (h *QAHandler) Ask(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {
+		logger.L.Error("user id missing in context for QA Ask")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in context"})
 		return
 	}
 
 	var req services.AskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L.Warn("invalid QA Ask request",
+			zap.Error(err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
 	resp, err := h.qaService.Ask(context.Background(), userID.(uint), req.Question)
 	if err != nil {
+		logger.L.Error("QA Ask failed",
+			zap.Error(err),
+			zap.Uint("user_id", userID.(uint)),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -45,12 +55,16 @@ func (h *QAHandler) Ask(c *gin.Context) {
 func (h *QAHandler) AskStream(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {
+		logger.L.Error("user id missing in context for QA AskStream")
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "user not found in context"})
 		return
 	}
 
 	var req services.AskRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
+		logger.L.Warn("invalid QA AskStream request",
+			zap.Error(err),
+		)
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
@@ -94,6 +108,9 @@ func (h *QAHandler) AskStream(c *gin.Context) {
 	if err != nil {
 		// Check if error is due to context cancellation (client disconnected)
 		if err == context.Canceled || err == context.DeadlineExceeded {
+			logger.L.Info("QA stream cancelled by client",
+				zap.Uint("user_id", userID.(uint)),
+			)
 			return
 		}
 

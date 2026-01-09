@@ -1,18 +1,27 @@
 package services
 
 import (
+	"context"
 	"errors"
+
+	"medical-qa-assistant/internal/logger"
 	"medical-qa-assistant/internal/models"
 	"medical-qa-assistant/internal/repositories"
+
+	"go.uber.org/zap"
 )
 
 // DocumentService contains business logic for document management.
 type DocumentService struct {
 	documentRepo *repositories.DocumentRepository
+	ragService   *RAGService
 }
 
-func NewDocumentService(documentRepo *repositories.DocumentRepository) *DocumentService {
-	return &DocumentService{documentRepo: documentRepo}
+func NewDocumentService(documentRepo *repositories.DocumentRepository, ragService *RAGService) *DocumentService {
+	return &DocumentService{
+		documentRepo: documentRepo,
+		ragService:   ragService,
+	}
 }
 
 type CreateDocumentRequest struct {
@@ -42,7 +51,29 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 	}
 
 	if err := s.documentRepo.Create(doc); err != nil {
+		logger.L.Error("failed to create document",
+			zap.Error(err),
+			zap.Uint("user_id", userID),
+			zap.String("title", req.Title),
+		)
 		return nil, err
+	}
+
+	// Index document into RAG store if enabled.
+	if s.ragService != nil && s.ragService.IsEnabled() {
+		// Use background context; in a real system you might want a request-scoped ctx.
+		if err := s.ragService.IndexDocument(context.Background(), doc); err != nil {
+			logger.L.Error("failed to index document into RAG",
+				zap.Error(err),
+				zap.Uint("document_id", doc.ID),
+				zap.Uint("user_id", doc.UserID),
+			)
+			return nil, err
+		}
+		logger.L.Info("document indexed into RAG",
+			zap.Uint("document_id", doc.ID),
+			zap.Uint("user_id", doc.UserID),
+		)
 	}
 
 	return doc, nil

@@ -35,14 +35,24 @@ func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 
 	// Initialize services
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
-	documentService := services.NewDocumentService(documentRepo)
+
+	// RAG embeddings: always use OpenAI as embedding provider, regardless of LLM_PROVIDER.
+	// QA (chat) can still switch between OpenAI and DeepSeek via LLM_PROVIDER.
+	ragService := services.NewRAGService(
+		cfg.OpenAIKey,
+		cfg.OpenAIBaseURL,
+		cfg.OpenAIEmbedModel,
+		cfg.ChromaBaseURL,
+		cfg.ChromaCollection,
+	)
+	documentService := services.NewDocumentService(documentRepo, ragService)
 
 	var qaService *services.QAService
 	switch cfg.LLMProvider {
 	case "deepseek":
-		qaService = services.NewQAService(cfg.DeepSeekKey, cfg.DeepSeekModel, cfg.DeepSeekBaseURL)
+		qaService = services.NewQAService(cfg.DeepSeekKey, cfg.DeepSeekModel, cfg.DeepSeekBaseURL, ragService)
 	default:
-		qaService = services.NewQAService(cfg.OpenAIKey, cfg.OpenAIModel, cfg.OpenAIBaseURL)
+		qaService = services.NewQAService(cfg.OpenAIKey, cfg.OpenAIModel, cfg.OpenAIBaseURL, ragService)
 	}
 
 	// Initialize handlers
