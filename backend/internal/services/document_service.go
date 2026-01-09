@@ -50,18 +50,9 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 		Status:  "ready",
 	}
 
-	if err := s.documentRepo.Create(doc); err != nil {
-		logger.L.Error("failed to create document",
-			zap.Error(err),
-			zap.Uint("user_id", userID),
-			zap.String("title", req.Title),
-		)
-		return nil, err
-	}
 
 	// Index document into RAG store if enabled.
 	if s.ragService != nil && s.ragService.IsEnabled() {
-		// Use background context; in a real system you might want a request-scoped ctx.
 		if err := s.ragService.IndexDocument(context.Background(), doc); err != nil {
 			logger.L.Error("failed to index document into RAG",
 				zap.Error(err),
@@ -74,6 +65,15 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 			zap.Uint("document_id", doc.ID),
 			zap.Uint("user_id", doc.UserID),
 		)
+	}
+
+	if err := s.documentRepo.Create(doc); err != nil {
+		logger.L.Error("failed to create document",
+			zap.Error(err),
+			zap.Uint("user_id", userID),
+			zap.String("title", req.Title),
+		)
+		return nil, err
 	}
 
 	return doc, nil
