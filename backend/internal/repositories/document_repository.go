@@ -6,7 +6,7 @@ import (
 	"gorm.io/gorm"
 )
 
-// DocumentRepository provides CRUD operations for documents.
+// DocumentRepository 提供文档的 CRUD 操作
 type DocumentRepository struct {
 	db *gorm.DB
 }

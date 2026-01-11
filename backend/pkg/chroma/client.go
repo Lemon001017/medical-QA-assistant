@@ -10,14 +10,14 @@ import (
 	"time"
 )
 
-// Client is a client for interacting with Chroma vector database.
+// Client 是与 Chroma 向量数据库交互的客户端
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
 	collection string
 }
 
-// NewClient creates a new Chroma client.
+// NewClient 创建一个新的 Chroma 客户端
 func NewClient(baseURL, collection string) *Client {
 	if baseURL == "" {
 		baseURL = "http://localhost:8000"
@@ -34,24 +34,24 @@ func NewClient(baseURL, collection string) *Client {
 	}
 }
 
-// CollectionRequest represents a request to create/get a collection.
+// CollectionRequest 表示创建/获取集合的请求
 type CollectionRequest struct {
 	Name              string                 `json:"name"`
 	Metadata          map[string]interface{} `json:"metadata,omitempty"`
 	EmbeddingFunction string                 `json:"embedding_function,omitempty"`
 }
 
-// CollectionResponse represents a Chroma collection response.
+// CollectionResponse 表示 Chroma 集合响应
 type CollectionResponse struct {
 	Name     string                 `json:"name"`
 	ID       string                 `json:"id"`
 	Metadata map[string]interface{} `json:"metadata"`
 }
 
-// Float32Slice is a custom type for JSON marshaling of float32 slices.
+// Float32Slice 是用于 JSON 序列化 float32 切片的自定义类型
 type Float32Slice []float32
 
-// MarshalJSON converts float32 slice to float64 slice for JSON encoding.
+// MarshalJSON 将 float32 切片转换为 float64 切片用于 JSON 编码
 func (f Float32Slice) MarshalJSON() ([]byte, error) {
 	float64Slice := make([]float64, len(f))
 	for i, v := range f {
@@ -60,7 +60,7 @@ func (f Float32Slice) MarshalJSON() ([]byte, error) {
 	return json.Marshal(float64Slice)
 }
 
-// AddRequest represents a request to add documents to Chroma.
+// AddRequest 表示向 Chroma 添加文档的请求
 type AddRequest struct {
 	IDs        []string                 `json:"ids"`
 	Embeddings []Float32Slice           `json:"embeddings"`
@@ -68,7 +68,7 @@ type AddRequest struct {
 	Metadatas  []map[string]interface{} `json:"metadatas,omitempty"`
 }
 
-// QueryRequest represents a query request to Chroma.
+// QueryRequest 表示查询 Chroma 的请求
 type QueryRequest struct {
 	QueryEmbeddings []Float32Slice         `json:"query_embeddings"`
 	NResults        int                    `json:"n_results"`
@@ -76,7 +76,7 @@ type QueryRequest struct {
 	Include         []string               `json:"include,omitempty"`
 }
 
-// QueryResponse represents a query response from Chroma.
+// QueryResponse 表示来自 Chroma 的查询响应
 type QueryResponse struct {
 	IDs       [][]string                 `json:"ids"`
 	Distances [][]float64                `json:"distances"`
@@ -84,9 +84,9 @@ type QueryResponse struct {
 	Metadatas [][]map[string]interface{} `json:"metadatas"`
 }
 
-// EnsureCollection creates a collection if it doesn't exist, or gets it if it exists.
+// EnsureCollection 如果集合不存在则创建它，如果存在则获取它
 func (c *Client) EnsureCollection(ctx context.Context) error {
-	// Try to get the collection first
+	// 首先尝试获取集合
 	url := fmt.Sprintf("%s/api/v1/collections/%s", c.baseURL, c.collection)
 	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
 	if err != nil {
@@ -99,22 +99,22 @@ func (c *Client) EnsureCollection(ctx context.Context) error {
 	}
 	defer resp.Body.Close()
 
-	// If collection exists (200), we're done
+	// 如果集合存在（200），完成
 	if resp.StatusCode == http.StatusOK {
 		return nil
 	}
 
-	// If not found (404), create it
+	// 如果未找到（404），创建它
 	if resp.StatusCode == http.StatusNotFound {
 		return c.createCollection(ctx)
 	}
 
-	// Other error
+	// 其他错误
 	body, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 }
 
-// createCollection creates a new collection in Chroma.
+// createCollection 在 Chroma 中创建一个新集合
 func (c *Client) createCollection(ctx context.Context) error {
 	url := fmt.Sprintf("%s/api/v1/collections", c.baseURL)
 	reqBody := CollectionRequest{
@@ -149,7 +149,7 @@ func (c *Client) createCollection(ctx context.Context) error {
 	return nil
 }
 
-// Add adds documents with embeddings to Chroma.
+// Add 将带有嵌入向量的文档添加到 Chroma
 func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, documents []string, metadatas []map[string]interface{}) error {
 	if len(ids) != len(embeddings) || len(ids) != len(documents) {
 		return fmt.Errorf("ids, embeddings, and documents must have the same length")
@@ -157,7 +157,7 @@ func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, 
 
 	url := fmt.Sprintf("%s/api/v1/collections/%s/add", c.baseURL, c.collection)
 
-	// Convert [][]float32 to []Float32Slice for JSON marshaling
+	// 将 [][]float32 转换为 []Float32Slice 用于 JSON 序列化
 	embeddingSlices := make([]Float32Slice, len(embeddings))
 	for i, emb := range embeddings {
 		embeddingSlices[i] = Float32Slice(emb)
@@ -195,7 +195,7 @@ func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, 
 	return nil
 }
 
-// Query queries Chroma for similar documents.
+// Query 查询 Chroma 以查找相似文档
 func (c *Client) Query(ctx context.Context, queryEmbedding []float32, nResults int, where map[string]interface{}) (*QueryResponse, error) {
 	url := fmt.Sprintf("%s/api/v1/collections/%s/query", c.baseURL, c.collection)
 	reqBody := QueryRequest{
@@ -235,7 +235,7 @@ func (c *Client) Query(ctx context.Context, queryEmbedding []float32, nResults i
 	return &queryResp, nil
 }
 
-// Delete deletes documents from Chroma by IDs.
+// Delete 通过 ID 从 Chroma 删除文档
 func (c *Client) Delete(ctx context.Context, ids []string) error {
 	if len(ids) == 0 {
 		return nil

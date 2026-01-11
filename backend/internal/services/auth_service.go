@@ -36,25 +36,25 @@ type AuthResponse struct {
 }
 
 func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
-	// Check if username already exists
+	// 检查用户名是否已存在
 	_, err := s.userRepo.FindByUsername(req.Username)
 	if err == nil {
 		return nil, errors.New("username already exists")
 	}
 
-	// Check if email already exists
+	// 检查邮箱是否已存在
 	_, err = s.userRepo.FindByEmail(req.Email)
 	if err == nil {
 		return nil, errors.New("email already exists")
 	}
 
-	// Hash password
+	// 哈希密码
 	hashedPassword, err := utils.HashPassword(req.Password)
 	if err != nil {
 		return nil, err
 	}
 
-	// Create user
+	// 创建用户
 	user := &models.User{
 		Username: req.Username,
 		Email:    req.Email,
@@ -66,7 +66,7 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 		return nil, err
 	}
 
-	// Generate token
+	// 生成 token
 	token, err := utils.GenerateToken(user.ID, user.Username, user.Role, s.jwtSecret)
 	if err != nil {
 		return nil, err
@@ -79,18 +79,18 @@ func (s *AuthService) Register(req *RegisterRequest) (*AuthResponse, error) {
 }
 
 func (s *AuthService) Login(req *LoginRequest) (*AuthResponse, error) {
-	// Find user by username
+	// 通过用户名查找用户
 	user, err := s.userRepo.FindByUsername(req.Username)
 	if err != nil {
 		return nil, errors.New("invalid username or password")
 	}
 
-	// Check password
+	// 检查密码
 	if !utils.CheckPasswordHash(req.Password, user.Password) {
 		return nil, errors.New("invalid username or password")
 	}
 
-	// Generate token
+	// 生成 token
 	token, err := utils.GenerateToken(user.ID, user.Username, user.Role, s.jwtSecret)
 	if err != nil {
 		return nil, err

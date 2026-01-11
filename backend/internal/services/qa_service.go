@@ -13,7 +13,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// QAService handles question answering via cloud LLM providers and integrates RAG when available.
+// QAService 通过云 LLM 提供商处理问答，并在可用时集成 RAG
 type QAService struct {
 	client *openai.Client
 	model  string
@@ -22,7 +22,7 @@ type QAService struct {
 
 func NewQAService(apiKey, model, baseURL string, rag *RAGService) *QAService {
 	if apiKey == "" {
-		// Keep nil client; Ask will return clear error.
+		// 保持客户端为 nil；Ask 将返回明确的错误
 		return &QAService{model: model, rag: rag}
 	}
 	cfg := openai.DefaultConfig(apiKey)
@@ -95,8 +95,8 @@ func (s *QAService) Ask(ctx context.Context, userID uint, question string) (*Ask
 	return &AskResponse{Answer: answer}, nil
 }
 
-// AskStream handles streaming question answering via SSE.
-// It writes chunks to the provided writer function as they arrive.
+// AskStream 通过 SSE 处理流式问答
+// 当数据块到达时，将它们写入提供的写入函数
 func (s *QAService) AskStream(ctx context.Context, userID uint, question string, writeChunk func(string) error) error {
 	if userID == 0 {
 		return errors.New("invalid user")
@@ -139,7 +139,7 @@ func (s *QAService) AskStream(ctx context.Context, userID uint, question string,
 	for {
 		response, err := stream.Recv()
 		if errors.Is(err, io.EOF) {
-			// Stream ended
+			// 流结束
 			return nil
 		}
 		if err != nil {
@@ -157,27 +157,27 @@ func (s *QAService) AskStream(ctx context.Context, userID uint, question string,
 	}
 }
 
-// buildMessagesWithContext constructs the chat messages including retrieved document context when RAG is enabled.
+// buildMessagesWithContext 构建聊天消息，包括在启用 RAG 时检索到的文档上下文
 func (s *QAService) buildMessagesWithContext(ctx context.Context, userID uint, question string) ([]openai.ChatCompletionMessage, error) {
-	// Default system prompt.
+	// 默认系统提示词
 	systemPrompt := "你是一个智能医学问答助手，请根据用户的问题，给出简洁明了且安全的医学回答。"
 
 	var contextText string
-	// if s.rag != nil && s.rag.IsEnabled() {
-	// 	chunks, err := s.rag.RetrieveRelevantChunks(ctx, userID, question, 5)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	if len(chunks) > 0 {
-	// 		var sb strings.Builder
-	// 		sb.WriteString("以下是与用户问题相关的医学文档片段，请优先根据这些内容回答问题：\n\n")
-	// 		for i, ch := range chunks {
-	// 			sb.WriteString(fmt.Sprintf("【片段 %d】:\n%s\n\n", i+1, ch.Content))
-	// 		}
-	// 		sb.WriteString("回答时请：\n- 仅基于上述片段中的信息进行推理；\n- 如果文档中没有足够信息，请明确说明\"根据已提供文档无法确定\"，不要编造；\n- 用中文回答。\n")
-	// 		contextText = sb.String()
-	// 	}
-	// }
+	if s.rag != nil && s.rag.IsEnabled() {
+		chunks, err := s.rag.RetrieveRelevantChunks(ctx, userID, question, 5)
+		if err != nil {
+			return nil, err
+		}
+		if len(chunks) > 0 {
+			var sb strings.Builder
+			sb.WriteString("以下是与用户问题相关的医学文档片段，请优先根据这些内容回答问题：\n\n")
+			for i, ch := range chunks {
+				sb.WriteString(fmt.Sprintf("【片段 %d】:\n%s\n\n", i+1, ch.Content))
+			}
+			sb.WriteString("回答时请：\n- 仅基于上述片段中的信息进行推理；\n- 如果文档中没有足够信息，请明确说明\"根据已提供文档无法确定\"，不要编造；\n- 用中文回答。\n")
+			contextText = sb.String()
+		}
+	}
 
 	systemContent := systemPrompt
 	if contextText != "" {

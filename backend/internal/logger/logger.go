@@ -7,11 +7,11 @@ import (
 )
 
 var (
-	// L is the global logger instance used across the backend.
+	// L 是在整个后端使用的全局日志实例
 	L *zap.Logger
 )
 
-// Init initializes the global logger. It should be called once at startup.
+// Init 初始化全局日志。应在启动时调用一次
 func Init() {
 	var err error
 	L, err = zap.NewProduction()
@@ -21,7 +21,7 @@ func Init() {
 	}
 }
 
-// Sync flushes any buffered log entries.
+// Sync 刷新所有缓冲的日志条目
 func Sync() {
 	if L != nil {
 		_ = L.Sync()

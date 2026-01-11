@@ -11,7 +11,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// DocumentService contains business logic for document management.
+// DocumentService 包含文档管理的业务逻辑
 type DocumentService struct {
 	documentRepo *repositories.DocumentRepository
 	ragService   *RAGService
@@ -50,8 +50,7 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 		Status:  "ready",
 	}
 
-
-	// Index document into RAG store if enabled.
+	// 如果启用，将文档索引到 RAG 存储
 	if s.ragService != nil && s.ragService.IsEnabled() {
 		if err := s.ragService.IndexDocument(context.Background(), doc); err != nil {
 			logger.L.Error("failed to index document into RAG",

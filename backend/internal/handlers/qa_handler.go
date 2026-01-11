@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// QAHandler handles question answering requests.
+// QAHandler 处理问答请求
 type QAHandler struct {
 	qaService *services.QAService
 }
@@ -51,7 +51,7 @@ func (h *QAHandler) Ask(c *gin.Context) {
 	c.JSON(http.StatusOK, resp)
 }
 
-// AskStream handles streaming question answering requests via SSE.
+// AskStream 通过 SSE 处理流式问答请求
 func (h *QAHandler) AskStream(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {
@@ -69,44 +69,44 @@ func (h *QAHandler) AskStream(c *gin.Context) {
 		return
 	}
 
-	// Set headers for SSE
+	// 设置 SSE 响应头
 	c.Header("Content-Type", "text/event-stream")
 	c.Header("Cache-Control", "no-cache")
 	c.Header("Connection", "keep-alive")
-	c.Header("X-Accel-Buffering", "no") // Disable nginx buffering
+	c.Header("X-Accel-Buffering", "no") // 禁用 nginx 缓冲
 	c.Header("Access-Control-Allow-Origin", "*")
 
-	// Use request context to handle client disconnection
+	// 使用请求上下文处理客户端断开连接
 	ctx := c.Request.Context()
 
-	// Stream the response
+	// 流式传输响应
 	err := h.qaService.AskStream(ctx, userID.(uint), req.Question, func(chunk string) error {
-		// Check if context is cancelled (client disconnected)
+		// 检查上下文是否已取消（客户端断开连接）
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
 		default:
 		}
 
-		// Format as SSE data
+		// 格式化为 SSE 数据
 		data, err := json.Marshal(map[string]string{"chunk": chunk})
 		if err != nil {
 			return fmt.Errorf("failed to marshal chunk: %w", err)
 		}
 
-		// Write SSE format: data: {...}\n\n
+		// 写入 SSE 格式：data: {...}\n\n
 		_, err = c.Writer.WriteString(fmt.Sprintf("data: %s\n\n", string(data)))
 		if err != nil {
 			return fmt.Errorf("failed to write chunk: %w", err)
 		}
 
-		// Flush the response
+		// 刷新响应
 		c.Writer.Flush()
 		return nil
 	})
 
 	if err != nil {
-		// Check if error is due to context cancellation (client disconnected)
+		// 检查错误是否由于上下文取消（客户端断开连接）
 		if err == context.Canceled || err == context.DeadlineExceeded {
 			logger.L.Info("QA stream cancelled by client",
 				zap.Uint("user_id", userID.(uint)),
@@ -114,14 +114,14 @@ func (h *QAHandler) AskStream(c *gin.Context) {
 			return
 		}
 
-		// Send error as SSE event
+		// 将错误作为 SSE 事件发送
 		errorData, _ := json.Marshal(map[string]string{"error": err.Error()})
 		c.Writer.WriteString(fmt.Sprintf("data: %s\n\n", string(errorData)))
 		c.Writer.Flush()
 		return
 	}
 
-	// Send done event
+	// 发送完成事件
 	doneData, _ := json.Marshal(map[string]string{"done": "true"})
 	c.Writer.WriteString(fmt.Sprintf("data: %s\n\n", string(doneData)))
 	c.Writer.Flush()

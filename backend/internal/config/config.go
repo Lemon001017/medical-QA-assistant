@@ -13,7 +13,7 @@ type Config struct {
 	JWTSecret  string
 	Port       string
 
-	// LLM config
+	// LLM 配置
 	LLMProvider      string
 	OpenAIKey        string
 	OpenAIModel      string
@@ -23,7 +23,7 @@ type Config struct {
 	DeepSeekModel    string
 	DeepSeekBaseURL  string
 
-	// Chroma config
+	// Chroma 配置
 	ChromaBaseURL    string
 	ChromaCollection string
 }

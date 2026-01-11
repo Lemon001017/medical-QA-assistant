@@ -14,16 +14,16 @@ import (
 )
 
 func main() {
-	// Initialize structured logger first.
+	// 首先初始化结构化日志
 	logger.Init()
 	defer logger.Sync()
 
-	// Load .env file for local development; fall back to existing environment.
+	// 加载 .env 文件用于本地开发；如果不存在则使用现有环境变量
 	if err := godotenv.Load(); err != nil {
 		logger.L.Warn("no .env file loaded", zap.Error(err))
 	}
 
-	// Load configuration
+	// 加载配置
 	cfg := config.Load()
 	logger.L.Info("configuration loaded",
 		zap.String("db_host", cfg.DBHost),
@@ -32,7 +32,7 @@ func main() {
 		zap.String("port", cfg.Port),
 	)
 
-	// Connect to database
+	// 连接数据库
 	dsn := fmt.Sprintf("%s:%s@tcp(%s:%s)/%s?charset=utf8mb4&parseTime=True&loc=Local",
 		cfg.DBUser, cfg.DBPassword, cfg.DBHost, cfg.DBPort, cfg.DBName)
 
@@ -41,15 +41,15 @@ func main() {
 		logger.L.Fatal("failed to connect to database", zap.Error(err))
 	}
 
-	// Auto migrate (document chunks and vectors are stored in Chroma, not MySQL)
+	// 自动迁移（文档块和向量存储在 Chroma 中，不在 MySQL）
 	if err := db.AutoMigrate(&models.User{}, &models.Document{}); err != nil {
 		logger.L.Fatal("failed to migrate database", zap.Error(err))
 	}
 
-	// Setup routes
+	// 设置路由
 	router := api.SetupRoutes(db, cfg)
 
-	// Start server
+	// 启动服务器
 	addr := fmt.Sprintf(":%s", cfg.Port)
 	logger.L.Info("server starting",
 		zap.String("addr", addr),

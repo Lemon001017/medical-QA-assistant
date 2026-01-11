@@ -12,7 +12,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// DocumentHandler handles document related HTTP requests.
+// DocumentHandler 处理与文档相关的 HTTP 请求
 type DocumentHandler struct {
 	documentService *services.DocumentService
 }
@@ -137,7 +137,7 @@ func (h *DocumentHandler) Delete(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-// Upload handles multipart document upload.
+// Upload 处理多部分文档上传
 func (h *DocumentHandler) Upload(c *gin.Context) {
 	userID, ok := c.Get("user_id")
 	if !ok {

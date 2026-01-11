@@ -14,7 +14,7 @@ import (
 func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	router := gin.Default()
 
-	// CORS middleware
+	// CORS 中间件
 	router.Use(func(c *gin.Context) {
 		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
 		c.Writer.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -29,15 +29,15 @@ func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		c.Next()
 	})
 
-	// Initialize repositories
+	// 初始化仓储层
 	userRepo := repositories.NewUserRepository(db)
 	documentRepo := repositories.NewDocumentRepository(db)
 
-	// Initialize services
+	// 初始化服务层
 	authService := services.NewAuthService(userRepo, cfg.JWTSecret)
 
-	// RAG embeddings: always use OpenAI as embedding provider, regardless of LLM_PROVIDER.
-	// QA (chat) can still switch between OpenAI and DeepSeek via LLM_PROVIDER.
+	// RAG 嵌入向量：始终使用 OpenAI 作为嵌入提供方，无论 LLM_PROVIDER 如何设置
+	// 问答（对话）仍可通过 LLM_PROVIDER 在 OpenAI 和 DeepSeek 之间切换
 	ragService := services.NewRAGService(
 		cfg.OpenAIKey,
 		cfg.OpenAIBaseURL,
@@ -55,19 +55,18 @@ func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 		qaService = services.NewQAService(cfg.OpenAIKey, cfg.OpenAIModel, cfg.OpenAIBaseURL, ragService)
 	}
 
-	// Initialize handlers
+	// 初始化处理器
 	authHandler := handlers.NewAuthHandler(authService)
 	documentHandler := handlers.NewDocumentHandler(documentService)
 	qaHandler := handlers.NewQAHandler(qaService)
 
-	// Public routes
+	// 公开路由
 	api := router.Group("/api/v1")
 	{
 		api.POST("/auth/register", authHandler.Register)
 		api.POST("/auth/login", authHandler.Login)
 	}
 
-	// Protected routes
 	protected := api.Group("")
 	protected.Use(middleware.AuthMiddleware(cfg.JWTSecret))
 	{

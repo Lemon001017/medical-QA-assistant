@@ -14,14 +14,14 @@ import (
 	"go.uber.org/zap"
 )
 
-// RAGService encapsulates document chunking, embedding generation and retrieval using Chroma.
+// RAGService 封装了文档分块、嵌入向量生成和使用 Chroma 进行检索的功能
 type RAGService struct {
 	embedClient  *openai.Client
 	embedModel   string
 	chromaClient *chroma.Client
 }
 
-// NewRAGService creates a new RAGService. If apiKey is empty, the service will be disabled.
+// NewRAGService 创建一个新的 RAGService。如果 apiKey 为空，服务将被禁用
 func NewRAGService(apiKey, baseURL, embedModel, chromaBaseURL, chromaCollection string) *RAGService {
 	rag := &RAGService{
 		embedModel: embedModel,
@@ -35,13 +35,13 @@ func NewRAGService(apiKey, baseURL, embedModel, chromaBaseURL, chromaCollection 
 		rag.embedClient = openai.NewClientWithConfig(cfg)
 	}
 
-	// Initialize Chroma client
+	// 初始化 Chroma 客户端
 	rag.chromaClient = chroma.NewClient(chromaBaseURL, chromaCollection)
 
-	// Ensure collection exists
+	// 确保集合存在
 	if rag.IsEnabled() {
 		if err := rag.chromaClient.EnsureCollection(context.Background()); err != nil {
-			// Log error but don't fail initialization
+			// 记录错误但不中断初始化
 			logger.L.Warn("failed to ensure Chroma collection",
 				zap.Error(err),
 				zap.String("chroma_base_url", chromaBaseURL),
@@ -53,15 +53,15 @@ func NewRAGService(apiKey, baseURL, embedModel, chromaBaseURL, chromaCollection 
 	return rag
 }
 
-// IsEnabled returns true if embeddings can be generated.
+// IsEnabled 返回是否可以生成嵌入向量
 func (s *RAGService) IsEnabled() bool {
 	return s != nil && s.embedClient != nil
 }
 
-// IndexDocument chunks a document, generates embeddings and stores them in Chroma.
+// IndexDocument 对文档进行分块，生成嵌入向量并存储到 Chroma
 func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) error {
 	if !s.IsEnabled() {
-		// RAG is disabled; no-op.
+		// RAG 已禁用，不执行任何操作
 		logger.L.Info("RAG disabled, skipping document indexing",
 			zap.Uint("document_id", doc.ID),
 			zap.Uint("user_id", doc.UserID),
@@ -72,7 +72,7 @@ func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) er
 		return errors.New("invalid document for indexing")
 	}
 
-	chunks := chunkText(doc.Content, 800) // simple character-based chunking
+	chunks := chunkText(doc.Content, 800) // 简单的基于字符的分块
 	if len(chunks) == 0 {
 		logger.L.Info("no chunks generated for document, skipping indexing",
 			zap.Uint("document_id", doc.ID),
@@ -81,7 +81,7 @@ func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) er
 		return nil
 	}
 
-	// Generate embeddings in a single batch.
+	// 批量生成嵌入向量
 	resp, err := s.embedClient.CreateEmbeddings(ctx, openai.EmbeddingRequest{
 		Model: openai.EmbeddingModel(s.embedModel),
 		Input: chunks,
@@ -99,14 +99,14 @@ func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) er
 		return fmt.Errorf("embeddings count mismatch: got %d, want %d", len(resp.Data), len(chunks))
 	}
 
-	// Prepare data for Chroma
+	// 准备 Chroma 数据
 	ids := make([]string, len(chunks))
 	embeddings := make([][]float32, len(chunks))
 	documents := make([]string, len(chunks))
 	metadatas := make([]map[string]interface{}, len(chunks))
 
 	for i, chunk := range chunks {
-		// Generate unique ID: document_id-chunk_index-user_id
+		// 生成唯一 ID：document_id-chunk_index-user_id
 		ids[i] = fmt.Sprintf("%d-%d-%d", doc.ID, i, doc.UserID)
 		embeddings[i] = resp.Data[i].Embedding
 		documents[i] = chunk
@@ -118,7 +118,7 @@ func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) er
 		}
 	}
 
-	// Store in Chroma
+	// 存储到 Chroma
 	if err := s.chromaClient.Add(ctx, ids, embeddings, documents, metadatas); err != nil {
 		logger.L.Error("failed to add document chunks to Chroma",
 			zap.Error(err),
@@ -132,7 +132,7 @@ func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) er
 	return nil
 }
 
-// RetrieveRelevantChunks returns top-k relevant chunks for the given question and user from Chroma.
+// RetrieveRelevantChunks 从 Chroma 返回给定问题和用户的前 k 个相关文档块
 func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, question string, topK int) ([]models.Chunk, error) {
 	if !s.IsEnabled() {
 		logger.L.Info("RAG disabled, skipping retrieval",
@@ -151,7 +151,7 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 		topK = 5
 	}
 
-	// Embed question
+	// 将问题转换为嵌入向量
 	logger.L.Info("creating question embedding",
 		zap.Uint("user_id", userID),
 		zap.String("model", s.embedModel),
@@ -174,7 +174,7 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 
 	queryVec := embedResp.Data[0].Embedding
 
-	// Query Chroma with user filter
+	// 使用用户过滤器查询 Chroma
 	where := map[string]interface{}{
 		"user_id": int(userID),
 	}
@@ -188,7 +188,7 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 		return nil, nil
 	}
 
-	// Convert Chroma response to Chunk models
+	// 将 Chroma 响应转换为 Chunk 模型
 	chunks := make([]models.Chunk, 0, len(queryResp.Documents[0]))
 	for i, doc := range queryResp.Documents[0] {
 		if i >= len(queryResp.Metadatas[0]) {
@@ -200,7 +200,7 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 			Content: doc,
 		}
 
-		// Extract metadata
+		// 提取元数据
 		if docID, ok := metadata["document_id"].(float64); ok {
 			chunk.DocumentID = uint(docID)
 		}
@@ -217,7 +217,7 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 	return chunks, nil
 }
 
-// chunkText is a simple helper that splits text into chunks of approximately maxLen characters.
+// chunkText 是一个简单的辅助函数，将文本分割成大约 maxLen 字符的块
 func chunkText(text string, maxLen int) []string {
 	text = strings.TrimSpace(text)
 	if text == "" || maxLen <= 0 {

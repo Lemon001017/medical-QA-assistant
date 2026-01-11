@@ -4,7 +4,7 @@ import (
 	"time"
 )
 
-// Document stores user uploaded medical document content and metadata.
+// Document 存储用户上传的医学文档内容和元数据
 type Document struct {
 	ID        uint      `json:"id" gorm:"primaryKey"`
 	UserID    uint      `json:"user_id" gorm:"index;not null"`

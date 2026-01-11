@@ -1,7 +1,6 @@
 package models
 
-// Chunk represents a chunk of a document retrieved from Chroma.
-// This is a lightweight data structure used for passing chunk data between services.
+// Chunk 表示从 Chroma 检索到的文档块
 type Chunk struct {
 	DocumentID uint   `json:"document_id"`
 	UserID     uint   `json:"user_id"`
