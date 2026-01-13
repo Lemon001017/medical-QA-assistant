@@ -50,22 +50,7 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 		Status:  "ready",
 	}
 
-	// 如果启用，将文档索引到 RAG 存储
-	if s.ragService != nil && s.ragService.IsEnabled() {
-		if err := s.ragService.IndexDocument(context.Background(), doc); err != nil {
-			logger.L.Error("failed to index document into RAG",
-				zap.Error(err),
-				zap.Uint("document_id", doc.ID),
-				zap.Uint("user_id", doc.UserID),
-			)
-			return nil, err
-		}
-		logger.L.Info("document indexed into RAG",
-			zap.Uint("document_id", doc.ID),
-			zap.Uint("user_id", doc.UserID),
-		)
-	}
-
+	// 先保存文档到数据库，获得 ID
 	if err := s.documentRepo.Create(doc); err != nil {
 		logger.L.Error("failed to create document",
 			zap.Error(err),
@@ -73,6 +58,23 @@ func (s *DocumentService) Create(userID uint, req *CreateDocumentRequest) (*mode
 			zap.String("title", req.Title),
 		)
 		return nil, err
+	}
+
+	if s.ragService != nil && s.ragService.IsEnabled() {
+		if err := s.ragService.IndexDocument(context.Background(), doc); err != nil {
+			logger.L.Error("failed to index document into RAG",
+				zap.Error(err),
+				zap.Uint("document_id", doc.ID),
+				zap.Uint("user_id", doc.UserID),
+			)
+			doc.Status = "indexing_failed"
+			s.documentRepo.Update(doc)
+		} else {
+			logger.L.Info("document indexed into RAG",
+				zap.Uint("document_id", doc.ID),
+				zap.Uint("user_id", doc.UserID),
+			)
+		}
 	}
 
 	return doc, nil
@@ -96,5 +98,32 @@ func (s *DocumentService) Delete(userID, docID uint) error {
 	if userID == 0 {
 		return errors.New("invalid user")
 	}
-	return s.documentRepo.DeleteByIDAndUser(docID, userID)
+
+	// 先删除 Chroma 中的向量数据（如果启用）
+	if s.ragService != nil && s.ragService.IsEnabled() {
+		if err := s.ragService.DeleteDocument(context.Background(), docID, userID); err != nil {
+			logger.L.Error("failed to delete document from RAG",
+				zap.Error(err),
+				zap.Uint("document_id", docID),
+				zap.Uint("user_id", userID),
+			)
+		}
+	}
+
+	// 删除数据库中的文档记录
+	if err := s.documentRepo.DeleteByIDAndUser(docID, userID); err != nil {
+		logger.L.Error("failed to delete document from database",
+			zap.Error(err),
+			zap.Uint("document_id", docID),
+			zap.Uint("user_id", userID),
+		)
+		return err
+	}
+
+	logger.L.Info("document deleted successfully",
+		zap.Uint("document_id", docID),
+		zap.Uint("user_id", userID),
+	)
+
+	return nil
 }

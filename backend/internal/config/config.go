@@ -18,14 +18,18 @@ type Config struct {
 	OpenAIKey        string
 	OpenAIModel      string
 	OpenAIBaseURL    string
-	OpenAIEmbedModel string
 	DeepSeekKey      string
 	DeepSeekModel    string
 	DeepSeekBaseURL  string
 
-	// Chroma 配置
+	// Chroma 向量数据库配置
 	ChromaBaseURL    string
 	ChromaCollection string
+
+	// embedding 配置
+	AliyunEmbeddingModel string
+	AliyunEmbeddingKey string
+	AliyunEmbeddingBaseURL string
 }
 
 func Load() *Config {
@@ -42,13 +46,16 @@ func Load() *Config {
 		OpenAIKey:        getEnv("OPENAI_API_KEY", ""),
 		OpenAIModel:      getEnv("OPENAI_MODEL", "gpt-3.5-turbo"),
 		OpenAIBaseURL:    getEnv("OPENAI_BASE_URL", "https://api.openai.com/v1"),
-		OpenAIEmbedModel: getEnv("OPENAI_EMBEDDING_MODEL", "text-embedding-ada-002"),
 		DeepSeekKey:      getEnv("DEEPSEEK_API_KEY", ""),
 		DeepSeekModel:    getEnv("DEEPSEEK_MODEL", "deepseek-chat"),
 		DeepSeekBaseURL:  getEnv("DEEPSEEK_BASE_URL", "https://api.deepseek.com/v1"),
 
 		ChromaBaseURL:    getEnv("CHROMA_BASE_URL", "http://localhost:8000"),
 		ChromaCollection: getEnv("CHROMA_COLLECTION", "medical_documents"),
+
+		AliyunEmbeddingModel: getEnv("ALIYUN_EMBEDDING_MODEL", "text-embedding-v4"),
+		AliyunEmbeddingKey: getEnv("ALIYUN_EMBEDDING_KEY", ""),
+		AliyunEmbeddingBaseURL: getEnv("ALIYUN_EMBEDING_BASEURL", "https://dashscope.aliyuncs.com/compatible-mode/v1"),
 	}
 }
 

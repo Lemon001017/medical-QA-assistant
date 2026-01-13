@@ -19,6 +19,10 @@ func (r *DocumentRepository) Create(doc *models.Document) error {
 	return r.db.Create(doc).Error
 }
 
+func (r *DocumentRepository) Update(doc *models.Document) error {
+	return r.db.Save(doc).Error
+}
+
 func (r *DocumentRepository) ListByUser(userID uint) ([]models.Document, error) {
 	var docs []models.Document
 	if err := r.db.Where("user_id = ?", userID).Order("created_at desc").Find(&docs).Error; err != nil {

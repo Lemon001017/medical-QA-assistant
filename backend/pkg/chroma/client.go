@@ -84,11 +84,40 @@ type QueryResponse struct {
 	Metadatas [][]map[string]interface{} `json:"metadatas"`
 }
 
+// getCollectionID 获取集合的 ID
+func (c *Client) getCollectionID(ctx context.Context) (string, error) {
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s", c.baseURL, c.collection)
+	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("failed to create request: %w", err)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("failed to get collection: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("failed to get collection: status %d", resp.StatusCode)
+	}
+
+	var collectionResp CollectionResponse
+	if err := json.NewDecoder(resp.Body).Decode(&collectionResp); err != nil {
+		return "", fmt.Errorf("failed to decode collection response: %w", err)
+	}
+
+	if collectionResp.ID != "" {
+		return collectionResp.ID, nil
+	}
+	return c.collection, nil
+}
+
 // EnsureCollection 如果集合不存在则创建它，如果存在则获取它
 func (c *Client) EnsureCollection(ctx context.Context) error {
 	// 首先尝试获取集合
-	url := fmt.Sprintf("%s/api/v1/collections/%s", c.baseURL, c.collection)
-	req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s", c.baseURL, c.collection)
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -109,14 +138,13 @@ func (c *Client) EnsureCollection(ctx context.Context) error {
 		return c.createCollection(ctx)
 	}
 
-	// 其他错误
 	body, _ := io.ReadAll(resp.Body)
 	return fmt.Errorf("unexpected status %d: %s", resp.StatusCode, string(body))
 }
 
 // createCollection 在 Chroma 中创建一个新集合
 func (c *Client) createCollection(ctx context.Context) error {
-	url := fmt.Sprintf("%s/api/v1/collections", c.baseURL)
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections", c.baseURL)
 	reqBody := CollectionRequest{
 		Name: c.collection,
 		Metadata: map[string]interface{}{
@@ -129,7 +157,7 @@ func (c *Client) createCollection(ctx context.Context) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -154,8 +182,12 @@ func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, 
 	if len(ids) != len(embeddings) || len(ids) != len(documents) {
 		return fmt.Errorf("ids, embeddings, and documents must have the same length")
 	}
+	collectionID, err := c.getCollectionID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get collection id: %w", err)
+	}
 
-	url := fmt.Sprintf("%s/api/v1/collections/%s/add", c.baseURL, c.collection)
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s/upsert", c.baseURL, collectionID)
 
 	// 将 [][]float32 转换为 []Float32Slice 用于 JSON 序列化
 	embeddingSlices := make([]Float32Slice, len(embeddings))
@@ -175,7 +207,7 @@ func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, 
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -197,7 +229,11 @@ func (c *Client) Add(ctx context.Context, ids []string, embeddings [][]float32, 
 
 // Query 查询 Chroma 以查找相似文档
 func (c *Client) Query(ctx context.Context, queryEmbedding []float32, nResults int, where map[string]interface{}) (*QueryResponse, error) {
-	url := fmt.Sprintf("%s/api/v1/collections/%s/query", c.baseURL, c.collection)
+	collectionID, err := c.getCollectionID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collection id: %w", err)
+	}
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s/query", c.baseURL, collectionID)
 	reqBody := QueryRequest{
 		QueryEmbeddings: []Float32Slice{Float32Slice(queryEmbedding)},
 		NResults:        nResults,
@@ -210,7 +246,7 @@ func (c *Client) Query(ctx context.Context, queryEmbedding []float32, nResults i
 		return nil, fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -240,8 +276,13 @@ func (c *Client) Delete(ctx context.Context, ids []string) error {
 	if len(ids) == 0 {
 		return nil
 	}
+	
+	collectionID, err := c.getCollectionID(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to get collection id: %w", err)
+	}
 
-	url := fmt.Sprintf("%s/api/v1/collections/%s/delete", c.baseURL, c.collection)
+	url := fmt.Sprintf("%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s/delete", c.baseURL, collectionID)
 	reqBody := map[string]interface{}{
 		"ids": ids,
 	}
@@ -251,7 +292,7 @@ func (c *Client) Delete(ctx context.Context, ids []string) error {
 		return fmt.Errorf("failed to marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewBuffer(jsonData))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
 	if err != nil {
 		return fmt.Errorf("failed to create request: %w", err)
 	}
@@ -269,4 +310,58 @@ func (c *Client) Delete(ctx context.Context, ids []string) error {
 	}
 
 	return nil
+}
+
+// GetIDsByMetadata 使用 metadata 条件获取匹配的文档 IDs
+func (c *Client) GetIDsByMetadata(ctx context.Context, where map[string]interface{}) ([]string, error) {
+	collectionID, err := c.getCollectionID(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get collection id: %w", err)
+	}
+
+	url := fmt.Sprintf(
+		"%s/api/v2/tenants/default_tenant/databases/default_database/collections/%s/get",
+		c.baseURL,
+		collectionID,
+	)
+
+	reqBody := map[string]interface{}{
+		"where":   where,
+	}
+
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("failed to marshal request: %w", err)
+	}
+
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, url, bytes.NewBuffer(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("failed to create request: %w", err)
+	}
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get by metadata: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf(
+			"failed to get by metadata: status %d, body: %s",
+			resp.StatusCode,
+			string(body),
+		)
+	}
+
+	var getResp struct {
+		IDs []string `json:"ids"`
+	}
+
+	if err := json.NewDecoder(resp.Body).Decode(&getResp); err != nil {
+		return nil, fmt.Errorf("failed to decode response: %w", err)
+	}
+
+	return getResp.IDs, nil
 }

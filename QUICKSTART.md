@@ -52,13 +52,16 @@ go mod download
 3. 配置环境变量（创建 `.env` 文件，程序会自动加载）：
 ```bash
 cat > .env << 'EOF'
+# 数据库配置
 DB_HOST=localhost
 DB_PORT=3306
 DB_USER=root
-DB_PASSWORD=your_mysql_password
+DB_PASSWORD=
 DB_NAME=medical_qa
 JWT_SECRET=your-secret-key-change-in-production
 PORT=8081
+
+# 对话模型提供商（默认openai）
 LLM_PROVIDER=openai
 
 OPENAI_BASE_URL=https://api.openai.com/v1
@@ -70,8 +73,14 @@ DEEPSEEK_BASE_URL=https://api.deepseek.com/v1
 DEEPSEEK_API_KEY=
 DEEPSEEK_MODEL=deepseek-chat
 
+# 向量数据库配置
 CHROMA_BASE_URL=http://localhost:8000
 CHROMA_COLLECTION=medical_documents
+
+# 嵌入模型配置
+ALIYUN_EMBEDDING_MODEL=text-embedding-v4
+ALIYUN_EMBEDDING_KEY=
+ALIYUN_EMBEDDING_BASEURL=https://dashscope.aliyuncs.com/compatible-mode/v1
 EOF
 ```
 

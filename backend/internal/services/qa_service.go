@@ -160,7 +160,29 @@ func (s *QAService) AskStream(ctx context.Context, userID uint, question string,
 // buildMessagesWithContext 构建聊天消息，包括在启用 RAG 时检索到的文档上下文
 func (s *QAService) buildMessagesWithContext(ctx context.Context, userID uint, question string) ([]openai.ChatCompletionMessage, error) {
 	// 默认系统提示词
-	systemPrompt := "你是一个智能医学问答助手，请根据用户的问题，给出简洁明了且安全的医学回答。"
+	systemPrompt := `
+	你是一名专业、谨慎的医学问答助手，仅用于提供医学知识层面的信息支持。
+
+	【核心约束】
+	1. 你只回答医学及健康相关的问题（包括疾病、症状、检查、治疗方式的通用医学知识）。
+	2. 如果问题与医学无关，请直接说明你无法回答。
+	3. 你不能进行疾病诊断、个体化治疗方案制定或处方用药建议。
+	4. 不得编造医学事实、研究结论或指南内容。
+
+	【知识来源优先级】
+	1. 若提供了“医学文档片段”，必须优先基于片段内容进行回答。
+	2. 只有在文档片段信息不足时，才可以补充医学常识性知识。
+	3. 若文档与常识均不足以支持回答，应明确说明“不确定”或“无法给出可靠结论”。
+
+	【回答规范】
+	- 使用中文作答
+	- 语言专业、清晰、简洁
+	- 可使用条列或小标题
+	- 避免绝对化表述（如“一定”“必须”“完全治愈”）
+	- 必要时提醒用户咨询专业医生
+
+	你的目标是：**在保证安全与准确的前提下，帮助用户理解医学问题，而不是替代医生。**
+	`
 
 	var contextText string
 	if s.rag != nil && s.rag.IsEnabled() {
@@ -170,11 +192,23 @@ func (s *QAService) buildMessagesWithContext(ctx context.Context, userID uint, q
 		}
 		if len(chunks) > 0 {
 			var sb strings.Builder
-			sb.WriteString("以下是与用户问题相关的医学文档片段，请优先根据这些内容回答问题：\n\n")
+			sb.WriteString(`
+			以下是与用户问题相关的医学文档片段（可能来自指南、教材或医学资料）：
+
+			请严格按照以下规则回答：
+			1. 回答时必须优先基于文档片段中的信息进行推理和总结；
+			2. 如果文档片段无法直接回答问题，可补充通用医学知识；
+			3. 如果无法基于可靠医学信息回答，请明确说明“文档和医学常识均不足以支持明确结论”；
+			4. 禁止编造文档中不存在的结论或数据；
+			5. 回答应保持医学审慎性，避免诊断式或处方式表述。
+
+			医学文档片段如下：
+			`)
+
 			for i, ch := range chunks {
 				sb.WriteString(fmt.Sprintf("【片段 %d】:\n%s\n\n", i+1, ch.Content))
 			}
-			sb.WriteString("回答时请：\n- 仅基于上述片段中的信息进行推理；\n- 如果文档中没有足够信息，请明确说明\"根据已提供文档无法确定\"，不要编造；\n- 用中文回答。\n")
+			sb.WriteString("回答时请：\n- 优先基于上述片段中的信息进行推理；\n- 如果文档中没有足够信息，可以查找网上相关的医学知识，但是请记住不要编造；\n- 用中文回答。\n")
 			contextText = sb.String()
 		}
 	}

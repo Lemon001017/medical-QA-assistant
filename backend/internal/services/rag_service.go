@@ -61,7 +61,6 @@ func (s *RAGService) IsEnabled() bool {
 // IndexDocument 对文档进行分块，生成嵌入向量并存储到 Chroma
 func (s *RAGService) IndexDocument(ctx context.Context, doc *models.Document) error {
 	if !s.IsEnabled() {
-		// RAG 已禁用，不执行任何操作
 		logger.L.Info("RAG disabled, skipping document indexing",
 			zap.Uint("document_id", doc.ID),
 			zap.Uint("user_id", doc.UserID),
@@ -216,6 +215,64 @@ func (s *RAGService) RetrieveRelevantChunks(ctx context.Context, userID uint, qu
 
 	return chunks, nil
 }
+
+// DeleteDocument 从 Chroma 中删除指定文档的所有向量数据
+func (s *RAGService) DeleteDocument(ctx context.Context, docID, userID uint) error {
+	if !s.IsEnabled() {
+		logger.L.Info("RAG disabled, skipping document deletion from Chroma",
+			zap.Uint("document_id", docID),
+			zap.Uint("user_id", userID),
+		)
+		return nil
+	}
+	if docID == 0 || userID == 0 {
+		return errors.New("invalid document or user for deletion")
+	}
+
+	where := map[string]interface{}{
+		"$and": []map[string]interface{}{
+			{"document_id": int(docID)},
+			{"user_id": int(userID)},
+		},
+	}
+
+	ids, err := s.chromaClient.GetIDsByMetadata(ctx, where)
+	if err != nil {
+		logger.L.Error("failed to get document chunk ids for deletion",
+			zap.Error(err),
+			zap.Uint("document_id", docID),
+			zap.Uint("user_id", userID),
+		)
+		return fmt.Errorf("failed to get document chunk ids: %w", err)
+	}
+
+	if len(ids) == 0 {
+		logger.L.Info("no chunks found for document deletion",
+			zap.Uint("document_id", docID),
+			zap.Uint("user_id", userID),
+		)
+		return nil
+	}
+
+	if err := s.chromaClient.Delete(ctx, ids); err != nil {
+		logger.L.Error("failed to delete document chunks from Chroma",
+			zap.Error(err),
+			zap.Uint("document_id", docID),
+			zap.Uint("user_id", userID),
+			zap.Int("chunk_count", len(ids)),
+		)
+		return fmt.Errorf("failed to delete chunks from Chroma: %w", err)
+	}
+
+	logger.L.Info("document chunks deleted from Chroma",
+		zap.Uint("document_id", docID),
+		zap.Uint("user_id", userID),
+		zap.Int("chunk_count", len(ids)),
+	)
+
+	return nil
+}
+
 
 // chunkText 是一个简单的辅助函数，将文本分割成大约 maxLen 字符的块
 func chunkText(text string, maxLen int) []string {

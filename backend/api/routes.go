@@ -39,9 +39,9 @@ func SetupRoutes(db *gorm.DB, cfg *config.Config) *gin.Engine {
 	// RAG 嵌入向量：始终使用 OpenAI 作为嵌入提供方，无论 LLM_PROVIDER 如何设置
 	// 问答（对话）仍可通过 LLM_PROVIDER 在 OpenAI 和 DeepSeek 之间切换
 	ragService := services.NewRAGService(
-		cfg.OpenAIKey,
-		cfg.OpenAIBaseURL,
-		cfg.OpenAIEmbedModel,
+		cfg.AliyunEmbeddingKey,
+		cfg.AliyunEmbeddingBaseURL,
+		cfg.AliyunEmbeddingModel,
 		cfg.ChromaBaseURL,
 		cfg.ChromaCollection,
 	)
